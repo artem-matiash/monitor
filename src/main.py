@@ -12,6 +12,11 @@ from player import Player
 
 import pandas as pd
 
+# GLOBAL DF
+price_df = None
+logs_df = None
+tradelog_df = None
+
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -74,8 +79,29 @@ app.layout = html.Div([
         n_clicks=0
     ),
     html.Div(
+        [
+            dcc.Graph(
+                id='graph-equity',
+                style={'height': '250px'}
+            ),
+            dcc.Graph(
+                id='graph-price',
+                style={'height': '250px'}
+            ),
+            html.Div(
+                dcc.Slider(
+                    id='year-slider'
+                ),
+                id='slider-container'
+            )
+        ],
         id='container',
-        style = {'display': 'inline-block', 'width': '100%'}
+        style = {
+            'display': 'inline-block',
+            'textAlign': 'center',
+            'width': '75%',
+            'margin-left': '3%'
+        }
     )
 ])
 
@@ -87,71 +113,69 @@ def parse_content(content):
     df.set_index('timestamp', inplace=True)
     return df
 
-# def parse_contents(contents, filename, date):
-#     content_type, content_string = contents.split(',')
-#
-#     decoded = base64.b64decode(content_string)
-#     try:
-#         if 'csv' in filename:
-#             # Assume that the user uploaded a CSV file
-#             df = pd.read_csv(
-#                 io.StringIO(decoded.decode('utf-8')))
-#         elif 'xls' in filename:
-#             # Assume that the user uploaded an excel file
-#             df = pd.read_excel(io.BytesIO(decoded))
-#     except Exception as e:
-#         print(e)
-#         return html.Div([
-#             'There was an error processing this file.'
-#         ])
-#
-#     return html.Div([
-#         html.H5(filename),
-#         html.H6(datetime.datetime.fromtimestamp(date)),
-#
-#         dash_table.DataTable(
-#             data=df.to_dict('records'),
-#             columns=[{'name': i, 'id': i} for i in df.columns]
-#         ),
-#
-#         html.Hr(),  # horizontal line
-#
-#         # For debugging, display the raw contents provided by the web browser
-#         html.Div('Raw Content'),
-#         html.Pre(contents[0:200] + '...', style={
-#             'whiteSpace': 'pre-wrap',
-#             'wordBreak': 'break-all'
-#         })
-#     ])
+@app.callback(
+    [
+        Output('graph-equity', 'figure'),
+        Output('graph-price', 'figure')
+    ],
+    [
+        Input('year-slider', 'value')
+    ]
+)
+def update_graph(value):
+    if price_df is not None and logs_df is not None:
+        price_df_last_year = price_df.loc[pd.Timestamp(value, 1, 1):pd.Timestamp(value, 12, 31)]
+        logs_df_last_year = logs_df.loc[pd.Timestamp(value, 1, 1):pd.Timestamp(value, 12, 31)]
 
+        price_df_stripped = price_df.loc[:pd.Timestamp(value, 1, 1)]
+        logs_df_stripped = logs_df.loc[:pd.Timestamp(value, 1, 1)]
 
-# @app.callback(Output('output-data-upload', 'children'),
-#               [Input('upload-tradelog-data', 'contents'), Input('upload-price-data', 'contents')],
-#               [
-#                 State('upload-tradelog-data', 'filename'),
-#                 State('upload-tradelog-data', 'last_modified'),
-#                 State('upload-price-data', 'filename'),
-#                 State('upload-price-data', 'last_modified')
-#               ])
-# def update_output(list_of_contents, list_of_names, list_of_dates):
-#     if list_of_contents is not None:
-#         children = [
-#             parse_contents(c, n, d) for c, n, d in
-#             zip(list_of_contents, list_of_names, list_of_dates)]
-#         return children
-
-# @app.callback(
-#     dash.dependencies.Output('container-button-basic', 'children'),
-#     [dash.dependencies.Input('button', 'n_clicks')],
-#     [dash.dependencies.State('input-box', 'value')])
-# def update_output(n_clicks, value):
-#     return 'The input value was "{}" and the button has been clicked {} times'.format(
-#         value,
-#         n_clicks
-#     )
+        equity = figure={
+            'data': [
+                {
+                    'x': logs_df_stripped.index,
+                    'y': logs_df_stripped['equity'].values,
+                    'name': 'Previous Equity'
+                },
+                {
+                    'x': logs_df_last_year.index,
+                    'y': logs_df_last_year['equity'].values,
+                    'marker': {
+                        'color': 'green'
+                    },
+                    'name': 'Current Year'
+                }
+            ],
+            'layout': {
+                'title': 'Equity curve'
+            }
+        }
+        price = figure={
+            'data': [
+                {
+                    'x': price_df_stripped.index,
+                    'y': price_df_stripped['price'].values,
+                    'name': 'Previous Prices'
+                },
+                {
+                    'x': price_df_last_year.index,
+                    'y': price_df_last_year['price'].values,
+                    'marker': {
+                        'color': 'green'
+                    },
+                    'name': 'Current Year'
+                }
+            ],
+            'layout': {
+                'title': 'Historical prices'
+            }
+        }
+        return equity, price
+    else:
+        return {}, {}
 
 @app.callback(
-    Output('container', 'children'),
+    Output('slider-container', 'children'),
     [
         Input('button', 'n_clicks'),
         Input('upload-tradelog-data', 'contents'),
@@ -160,6 +184,7 @@ def parse_content(content):
 )
 def init_graphs(n_clicks, tradelog_content, price_content):
     if n_clicks > 0:
+        global tradelog_df, price_df, logs_df
         tradelog_df = parse_content(tradelog_content)
         price_df = parse_content(price_content)
 
@@ -169,40 +194,23 @@ def init_graphs(n_clicks, tradelog_content, price_content):
         player = Player(tradelog_df, price_df)
         logs_df = player.generate_equity_curve()
 
-        data = [
-            dcc.Graph(
-                id='graph-equity',
-                figure={
-                    'data': [
-                        {
-                            'x': logs_df.index,
-                            'y': logs_df['equity'].values
-                        }
+        # Slider info
+        months = price_df.index.map(lambda x: x.replace(day=1)).unique()
+        years = price_df.index.map(lambda x: x.year).unique()
 
-                    ],
-                    'layout': {
-                        'title': 'Equity curve'
-                    }
-                },
-                style={'height': '300px'}
-            ),
-            dcc.Graph(
-                id='graph-price',
-                figure={
-                    'data': [
-                        {
-                            'x': price_df.index,
-                            'y': price_df['price'].values
-                        }
-                    ],
-                    'layout': {
-                        'title': 'Historical prices'
-                    }
-                },
-                style={'height': '300px'}
+        data = [
+            dcc.Slider(
+                id='year-slider',
+                min=years.min(),
+                max=years.max(),
+                marks={str(year): str(year) for year in years},
+                step=None,
+                value=years.max()
             )
         ]
-        return html.Div(data)
+        return html.Div(
+            data
+        )
 
 
 if __name__ == '__main__':

@@ -25,6 +25,7 @@ class Position:
     def mark_to_market(self, timestamp, new_price):
         self.unrealised_pnl = (new_price - self.price) * self.size * self.side_to_sign[self.side]
         self.timestamp = timestamp
+        self.equity = self.unrealised_pnl + self.realised_pnl - self.total_commission
         message = "MTM"
         self._log(message)
 
@@ -53,14 +54,14 @@ class Position:
             # RECEIVING NEW FILLS THAT PARTIALLY DECREASE YOUR POSITION
             if trade_size < self.size:
                 message = "DECREASE"
-                self.realised_pnl += (trade_price - self.price) * trade_size
+                self.realised_pnl += (trade_price - self.price) * trade_size * self.side_to_sign[self.side]
                 self.size -= trade_size
                 self.unrealised_pnl = (trade_price - self.price) * self.size * self.side_to_sign[self.side]
             # Scenario 3
             # RECEIVING FILLS THAT FLATTEN YOUR POSITION
             elif trade_size == self.size:
                 message = "FLAT"
-                self.realised_pnl += (trade_price - self.price) * trade_size
+                self.realised_pnl += (trade_price - self.price) * trade_size * self.side_to_sign[self.side]
                 self.size -= trade_size
                 self.price = None
                 self.side = None
@@ -72,7 +73,7 @@ class Position:
             # RECEIVING FILLS THAT REVERSE YOUR POSITION
             else:
                 message = "REVERSE"
-                self.realised_pnl += (trade_price - self.price) * self.size
+                self.realised_pnl += (trade_price - self.price) * self.size * self.side_to_sign[self.side]
                 self.price = trade_price
                 self.size = abs(self.size - trade_size)
                 self.side = trade_side
