@@ -13,6 +13,7 @@ from textwrap import dedent
 
 import pandas as pd
 import numpy as np
+import talib as tb
 
 # Assumptions
 base = 1e6
@@ -45,12 +46,33 @@ def format_stats(sharpe=None, dif_return=None, roi=None, vol=None):
         * Volatility: {}
     '''.format(str_sharpe, str_dif_return, str_roi, str_vol))
 
-def form_advice():
+def MMRSN(array):
+    mc = 0
+    mrc = 0
+    for i in range(len(array) - 1):
+        if array[i] * array[i+1] < 0:
+            mrc += 1
+        elif array[i] * array[i+1] > 0:
+            mc += 1
+    print(mc, np.sum(np.abs(array[array>0])))
+    print(mrc, np.sum(np.abs(array[array<0])))
+    mc *= np.sum(np.abs(array[array>0]))
+    mrc *= np.sum(np.abs(array[array<0]))
+    momersion = 100 * mc / (mc + mrc)
+    return momersion
+
+def form_advice(price_df_year, logs_df_year):
+    price_returns = (price_df_year['price'] - price_df_year['price'].shift(1)).fillna(0.0) / base
+    logs_returns = (logs_df_year['equity'] - logs_df_year['equity'].shift(1)).fillna(0.0) / base
+    price_mmrsn = MMRSN(price_returns.values)
+    logs_mmrsn = MMRSN(logs_returns.values)
     return dedent('''
         #### **Advice**
-        * Trend:
+        * Trend: {} {}
         *
-    '''.format())
+    '''.format(price_mmrsn, logs_mmrsn))
+
+
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -143,11 +165,11 @@ app.layout = html.Div([
         }
     ),
     dcc.Markdown(
-        format_stats(),
+        """""",
         id='text'
     ),
     dcc.Markdown(
-        form_advice(),
+        """""",
         id='advice'
     )
 ])
@@ -273,10 +295,10 @@ def update_graph(value):
         stats = format_stats(sharpe, dif_return, roi, vol)
 
         # Form an advice
-        advice = None
+        advice = """"""#form_advice(price_df_last_year, logs_df_last_year)
         return equity, price, stats, advice
     else:
-        return {}, {}, format_stats(), form_advice()
+        return {}, {}, """""", """"""
 
 @app.callback(
     Output('slider-container', 'children'),
