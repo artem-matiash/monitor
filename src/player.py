@@ -4,9 +4,10 @@ from position import Position
 
 
 class Player:
-    def __init__(self, tradelog_df, data_df):
+    def __init__(self, tradelog_df, data_df, base):
         self.tradelog_df = tradelog_df
         self.data_df = data_df
+        self.base = base
 
     def generate_equity_curve(self):
         # Take ticker
@@ -24,7 +25,7 @@ class Player:
         for it, row in self.union_df.iterrows():
             if row['type'] == 'TRADE':
                 if position is None:
-                    position = Position(it, self.ticker)
+                    position = Position(it, self.ticker, self.base)
                 position.trade(
                     it,
                     row['side'],

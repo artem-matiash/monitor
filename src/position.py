@@ -3,17 +3,18 @@ import pandas as pd
 
 class Position:
     def __init__(
-        self, timestamp, ticker
+        self, timestamp, ticker, base
     ):
         self.timestamp = timestamp
         self.ticker = ticker
+        self.base = base
         self.side = None
         self.size = 0
         self.price = None
         self.realised_pnl = 0
         self.unrealised_pnl = 0
         self.total_commission = 0
-        self.equity = self.realised_pnl + self.unrealised_pnl - self.total_commission
+        self.equity = self.base + self.realised_pnl + self.unrealised_pnl - self.total_commission
         self.side_to_sign = {
             "SELL": -1,
             "BUY": 1
@@ -25,7 +26,7 @@ class Position:
     def mark_to_market(self, timestamp, new_price):
         self.unrealised_pnl = (new_price - self.price) * self.size * self.side_to_sign[self.side]
         self.timestamp = timestamp
-        self.equity = self.unrealised_pnl + self.realised_pnl - self.total_commission
+        self.equity = self.base + self.unrealised_pnl + self.realised_pnl - self.total_commission
         message = "MTM"
         self._log(message)
 
@@ -79,7 +80,7 @@ class Position:
                 self.side = trade_side
                 self.unrealised_pnl = 0
 
-        self.equity = self.unrealised_pnl + self.realised_pnl - self.total_commission
+        self.equity = self.base + self.unrealised_pnl + self.realised_pnl - self.total_commission
         self._log(message)
 
     def _log(self, message):
@@ -88,6 +89,7 @@ class Position:
             "unrealised_pnl": self.unrealised_pnl,
             "realised_pnl": self.realised_pnl,
             "total_commission": self.total_commission,
-            "equity": self.equity
+            "equity": self.equity,
+            "base": self.base
         }
         self.logs[self.timestamp] = stats
