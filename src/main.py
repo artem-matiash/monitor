@@ -41,7 +41,7 @@ def format_stats(sharpe=None, dif_return=None, roi=None, vol=None):
     return dedent('''
         #### **Annual Statistics**
         * Sharpe Ratio: {}
-        * Differential return: {}
+        * Differential Return: {}
         * ROI: {}
         * Volatility: {}
     '''.format(str_sharpe, str_dif_return, str_roi, str_vol))
@@ -62,16 +62,35 @@ def MMRSN(array):
     return momersion
 
 def form_advice(price_df_year, logs_df_year):
-    price_returns = (price_df_year['price'] - price_df_year['price'].shift(1)).fillna(0.0) / base
-    logs_returns = (logs_df_year['equity'] - logs_df_year['equity'].shift(1)).fillna(0.0) / base
-    price_mmrsn = MMRSN(price_returns.values)
-    logs_mmrsn = MMRSN(logs_returns.values)
-    return dedent('''
-        #### **Advice**
-        * Trend: {} {}
-        *
-    '''.format(price_mmrsn, logs_mmrsn))
+    market_adx = tb.ADX(high=price_df_year['high'], low=price_df_year['low'], close=price_df_year['close'], timeperiod=12)
+    market_sma = (price_df_year['close'] - price_df_year['close'].rolling(21).mean()).fillna(0)
+    market_rsi = tb.RSI(price_df_year['close'], 5)
+    market_rsi_symmetric = np.mean(np.abs(market_rsi - 50))
+    market_momentum_strength = "Very Strong" if np.mean(market_adx) >= 40 else "Strong" if np.mean(market_adx) >= 20 else "Weak"
+    market_momentum_direction = "Bullish" if np.mean(market_sma) >= 0 else "Bearish"
+    mean_reversion_potential = "Very High" if market_rsi_symmetric >= 40 else "High" if market_rsi_symmetric >= 20 else "Low"
+    strategy_result = (logs_df_year['equity'].iloc[-1] - logs_df_year['equity'].iloc[0]) / base
+    market_result = price_df_year['close'].iloc[-1] / price_df_year['close'].iloc[0] - 1
+    outperformed = "outperformed" if strategy_result > market_result else "did not outperform"
+    if outperformed == "outperformed":
+        epilogue = "Way to go! Nothing to consider."
+    else:
+        epilogue = "Not so good. Consider taking into an account this market conditions."
 
+    conclusion = """
+        Strategy {} the Market.
+        This is caused by {} {} Market and {} Mean Reversion Potential.
+        {}
+    """.format(outperformed, market_momentum_strength, market_momentum_direction, mean_reversion_potential, epilogue)
+
+    return dedent('''
+        #### **Advice Metrics**
+        * Market Momentum Strength: {}
+        * Market Momentum Direction: {}
+        * Mean Reversion Potential: {}
+        * Strategy result: {:.1%} (Market: {:.1%})
+        * Conclusion: {}
+    '''.format(market_momentum_strength, market_momentum_direction, mean_reversion_potential, strategy_result, market_result, conclusion))
 
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -295,7 +314,7 @@ def update_graph(value):
         stats = format_stats(sharpe, dif_return, roi, vol)
 
         # Form an advice
-        advice = """"""#form_advice(price_df_last_year, logs_df_last_year)
+        advice = form_advice(price_df_last_year, logs_df_last_year)
         return equity, price, stats, advice
     else:
         return {}, {}, """""", """"""
