@@ -3,7 +3,7 @@ TA_Lib==0.4.17
 plotly==3.7.1
 dash_table==3.7.0
 dash_core_components==0.48.0
-numpy==1.16.1
+numpy==1.22.0
 dash_html_components==0.16.0
 dash==0.43.0
 talib==0.1.1
